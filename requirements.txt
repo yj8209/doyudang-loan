@@ -1,17 +1,9 @@
-# Streamlit 웹앱 프레임워크
 streamlit==1.40.1
-
-# Google Drive API 연동
 google-api-python-client==2.151.0
 google-auth==2.36.0
 google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
-
-# 데이터 처리
 pandas==2.2.3
-
-# 시각화
 plotly==5.24.1
-
-# 기타 유틸
-python-dateutil==2.9.0python-dotenv==1.0.1
+python-dateutil==2.9.0
+python-dotenv==1.0.1
