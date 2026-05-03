@@ -24,26 +24,25 @@ OAUTH_CREDENTIALS_PATH = CONFIG_DIR / 'oauth_credentials.json'
 TOKEN_PATH = CONFIG_DIR / 'token.json'
 
 
-def _is_streamlit_cloud():
-    """Streamlit Cloud 환경인지 감지"""
+def _is_streamlit_cloud_runtime():
+    """실제 Streamlit 앱 실행 환경인지 확인"""
     try:
-        import streamlit as st
-        return hasattr(st, 'secrets') and 'token' in st.secrets
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        return ctx is not None
     except Exception:
         return False
 
 
 def _get_folder_id():
-    """폴더 ID를 환경에 따라 가져오기"""
-    # 1순위: Streamlit Cloud Secrets
-    try:
-        import streamlit as st
-        if 'gdrive' in st.secrets and 'folder_id' in st.secrets['gdrive']:
-            return st.secrets['gdrive']['folder_id']
-    except Exception:
-        pass
-    
-    # 2순위: 환경변수 (.env)
+    """폴더 ID 환경별 로드"""
+    if _is_streamlit_cloud_runtime():
+        try:
+            import streamlit as st
+            if 'gdrive' in st.secrets:
+                return st.secrets['gdrive']['folder_id']
+        except Exception:
+            pass
     return os.getenv('GDRIVE_FOLDER_ID')
 
 
@@ -51,7 +50,7 @@ GDRIVE_FOLDER_ID = _get_folder_id()
 
 
 def _credentials_from_secrets():
-    """Streamlit Cloud Secrets에서 인증정보 로드"""
+    """Streamlit Secrets에서 인증정보 로드"""
     import streamlit as st
     
     token_data = {
@@ -62,7 +61,6 @@ def _credentials_from_secrets():
         'client_secret': st.secrets['oauth']['client_secret'],
         'scopes': SCOPES,
     }
-    
     return Credentials.from_authorized_user_info(token_data, SCOPES)
 
 
@@ -70,15 +68,12 @@ def get_credentials():
     """OAuth 자격증명 로드"""
     creds = None
     
-    # Streamlit Cloud 환경
-    if _is_streamlit_cloud():
+    if _is_streamlit_cloud_runtime():
         creds = _credentials_from_secrets()
-        # 토큰 만료시 자동 갱신
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
         return creds
     
-    # 로컬 환경 (Codespace 포함)
     if TOKEN_PATH.exists():
         try:
             creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
@@ -153,6 +148,8 @@ def test_connection():
     print("=" * 60)
     print("🔐 Google Drive 연결 테스트 (OAuth)")
     print("=" * 60)
+    is_streamlit = _is_streamlit_cloud_runtime()
+    print(f"실행 환경: {'Streamlit Cloud' if is_streamlit else '로컬 (Codespace)'}")
     
     try:
         service = get_drive_service()
