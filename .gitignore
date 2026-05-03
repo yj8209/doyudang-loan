@@ -216,3 +216,41 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# ===== 두유당 대출관리 보안 설정 =====
+# Google API 인증 파일 (절대 업로드 금지)
+credentials.json
+client_secret*.json
+token.json
+token.pickle
+*.pickle
+
+# 환경변수 파일
+.env
+.env.local
+.env.*.local
+
+# 로컬 데이터 (개인 금융 정보)
+data/
+local_data/
+backups/
+*.sqlite
+*.db
+
+# 가상환경
+venv/
+.venv/
+env/
+
+# 에디터
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+logs/
