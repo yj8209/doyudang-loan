@@ -254,3 +254,7 @@ Thumbs.db
 # 로그
 *.log
 logs/
+
+# Service Account
+service_account.json
+config/service_account.json
