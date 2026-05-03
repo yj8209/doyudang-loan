@@ -258,3 +258,19 @@ logs/
 # Service Account
 service_account.json
 config/service_account.json
+
+# OAuth 인증 파일 (절대 커밋 금지)
+oauth_credentials.json
+config/oauth_credentials.json
+client_secret*.json
+config/client_secret*.json
+token.json
+config/token.json
+
+# OAuth 인증 파일 (절대 커밋 금지)
+oauth_credentials.json
+config/oauth_credentials.json
+client_secret*.json
+config/client_secret*.json
+token.json
+config/token.json
