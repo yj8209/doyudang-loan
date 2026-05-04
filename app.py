@@ -1,5 +1,5 @@
 """
-두유당 대출관리 앱 - 메인 화면 (개선 버전)
+두유당 대출관리 앱 - 메인
 """
 
 import streamlit as st
@@ -7,6 +7,7 @@ from src.services.loan_repository import get_active_loans
 from src.utils.helpers import format_currency
 
 
+# 페이지 설정
 st.set_page_config(
     page_title="두유당 대출관리",
     page_icon="💰",
@@ -14,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 커스텀 CSS - 모바일/좁은 화면에서도 잘 보이게
+# 커스텀 CSS
 st.markdown("""
 <style>
     .metric-card {
@@ -33,13 +34,6 @@ st.markdown("""
         font-weight: bold;
         color: #262730;
     }
-    .loan-card {
-        background-color: #ffffff;
-        border: 1px solid #e0e0e0;
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,7 +48,9 @@ def render_metric(label, value, suffix=""):
     """, unsafe_allow_html=True)
 
 
-def main():
+def render_dashboard():
+    """메인 대시보드"""
+    
     st.title("💰 두유당 대출관리")
     st.caption("5년 안에 대출을 갚아나가는 우리 부부의 여정")
     
@@ -76,11 +72,11 @@ def main():
     overall_progress = (total_repaid / total_initial * 100) if total_initial > 0 else 0
     
     # 5년 목표
-    target_balance = 19820000  # 1,982만원
+    target_balance = 19820000
     target_progress = ((total_initial - target_balance) / total_initial * 100) if total_initial > 0 else 0
     remaining_to_target = total_balance - target_balance
     
-    # 상단 요약 (커스텀 메트릭)
+    # 상단 요약
     col1, col2 = st.columns(2)
     
     with col1:
@@ -94,7 +90,6 @@ def main():
     st.markdown(f"**전체 진행률: {overall_progress:.1f}%**")
     st.progress(overall_progress / 100)
     
-    # 5년 목표
     st.divider()
     st.subheader("🎯 5년 목표")
     
@@ -118,7 +113,6 @@ def main():
         medal = medals[i] if i < 3 else f"{i+1}."
         
         with st.container():
-            # 대출 헤더
             header_col1, header_col2 = st.columns([4, 1])
             with header_col1:
                 st.markdown(f"### {medal} {loan.loan_name}")
@@ -127,7 +121,6 @@ def main():
                 st.markdown(f"### {rate_emoji} {loan.interest_rate}%")
                 st.caption(f"{loan.rate_type}금리")
             
-            # 대출 정보 4컬럼
             info_col1, info_col2, info_col3, info_col4 = st.columns(4)
             
             with info_col1:
@@ -147,52 +140,47 @@ def main():
                 st.markdown("**상환률**")
                 st.markdown(f"#### {progress:.1f}%")
             
-            # 진행률 바
             st.progress(progress / 100)
             
-            # 추가 정보 + 액션
-            detail_col1, detail_col2 = st.columns([3, 1])
-            with detail_col1:
-                st.caption(
-                    f"🏦 {loan.bank_name} ({loan.branch}) | "
-                    f"📅 매월 {loan.payment_day}일 이체 | "
-                    f"⏰ 만기: {loan.maturity_date}"
-                )
-                if loan.memo:
-                    st.info(f"💬 {loan.memo}")
+            st.caption(
+                f"🏦 {loan.bank_name} ({loan.branch}) | "
+                f"📅 매월 {loan.payment_day}일 이체 | "
+                f"⏰ 만기: {loan.maturity_date}"
+            )
             
-            with detail_col2:
-                st.button(
-                    "➕ 부분 상환",
-                    key=f"repay_{loan.loan_id}",
-                    disabled=True,
-                    help="다음 단계에서 구현 예정",
-                    use_container_width=True
-                )
-                st.button(
-                    "📋 상세보기",
-                    key=f"detail_{loan.loan_id}",
-                    disabled=True,
-                    help="다음 단계에서 구현 예정",
-                    use_container_width=True
-                )
+            if loan.memo:
+                st.info(f"💬 {loan.memo}")
         
         st.divider()
     
-    # 하단 정보
+    # 데이터 정보
     with st.expander("📊 데이터 정보"):
         st.markdown(f"""
-        - **데이터 위치**: Google Drive `두유당_대출관리/loans.json`
+        - **데이터 위치**: Google Drive `두유당_대출관리/`
         - **5년 목표**: 잔액 {format_currency(target_balance)} (94.8% 상환)
         - **이자 절감 예상**: 약 2,100만원
         """)
+
+
+# ============= 메인 =============
+def main():
+    """메인 함수: 사이드바로 페이지 전환"""
     
-    # 사이드바
+    # 사이드바 메뉴
     with st.sidebar:
-        st.header("🚀 다음 단계")
-        st.markdown("""
-        **곧 추가될 기능:**
-        - ➕ 부분 상환 입력
+        st.title("💰 두유당 대출관리")
+        st.divider()
+        
+        page = st.radio(
+            "메뉴",
+            ["🏠 대시보드", "💸 부분 상환 입력"],
+            label_visibility="collapsed"
+        )
+        
+        st.divider()
+        
+        st.markdown("### 🚀 곧 추가될 기능")
+        st.caption("""
         - 📋 정기상환 확정
         - 🎯 부분상환 시뮬레이터
         - 📈 5년 진행 그래프
@@ -201,7 +189,14 @@ def main():
         """)
         
         st.divider()
-        st.caption("💡 본 앱은 부부의 자산을 함께 관리하는 도구입니다.")
+        st.caption("💡 부부의 자산을 함께 관리하는 도구")
+    
+    # 페이지 라우팅
+    if page == "🏠 대시보드":
+        render_dashboard()
+    elif page == "💸 부분 상환 입력":
+        from src.views.payment_form import render_payment_form
+        render_payment_form()
 
 
 if __name__ == "__main__":
