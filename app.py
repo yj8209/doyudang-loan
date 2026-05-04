@@ -1,5 +1,5 @@
 """
-두유당 대출관리 앱 - 메인
+YJ&HK 대출관리 앱 - 메인
 """
 
 import streamlit as st
@@ -9,7 +9,7 @@ from src.utils.helpers import format_currency
 
 # 페이지 설정
 st.set_page_config(
-    page_title="두유당 대출관리",
+    page_title="YJ&HK 대출관리",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -51,7 +51,7 @@ def render_metric(label, value, suffix=""):
 def render_dashboard():
     """메인 대시보드"""
     
-    st.title("💰 두유당 대출관리")
+    st.title("💰 YJ&HK 대출관리")
     st.caption("5년 안에 대출을 갚아나가는 우리 부부의 여정")
     
     with st.spinner("데이터 불러오는 중..."):
@@ -168,7 +168,7 @@ def main():
     
     # 사이드바 메뉴
     with st.sidebar:
-        st.title("💰 두유당 대출관리")
+        st.title("💰 YJ&HK 대출관리")
         st.divider()
         
         page = st.radio(
