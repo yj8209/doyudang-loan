@@ -173,7 +173,7 @@ def main():
         
         page = st.radio(
             "메뉴",
-            ["🏠 대시보드", "💸 부분 상환 입력", "📋 정기상환 확정", "🎯 부분상환 시뮬레이터", "🆕 신규 대출 추가", "🔄 대출 수정 / 만기 연장", "📜 상환 이력 관리"],
+            ["🏠 대시보드", "💸 부분 상환 입력", "📋 정기상환 확정", "🎯 부분상환 시뮬레이터", "🆕 신규 대출 추가", "🔄 대출 수정 / 만기 연장", "📜 상환 이력 관리", "📈 5년 진행 그래프"],
             label_visibility="collapsed"
         )
         
@@ -181,7 +181,6 @@ def main():
         
         st.markdown("### 🚀 곧 추가될 기능")
         st.caption("""
-        - 📈 5년 진행 그래프
         - 📅 캘린더 뷰
         - 🎁 이벤트 자금 관리
         """)
@@ -209,7 +208,10 @@ def main():
         render_loan_edit_form()
     elif page == "📜 상환 이력 관리":
         from src.views.payment_history_view import render_payment_history
-        render_payment_history()          
+        render_payment_history()
+    elif page == "📈 5년 진행 그래프":
+        from src.views.progress_view import render_progress_view
+        render_progress_view()          
 
 
 if __name__ == "__main__":

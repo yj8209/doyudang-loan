@@ -449,29 +449,41 @@ def delete_payment(
     """
     상환 이력 삭제 + 잔액 자동 복원
     
-    주의: 잔액에서 차감했던 원금을 복원합니다!
+    개선: payments.json 저장 성공 후에만 잔액 업데이트
     """
-    # 1. 삭제할 payment 가져오기
-    payment = get_payment_by_id(payment_id)
-    if not payment:
+    # 1. payments.json 직접 로드
+    all_payments_data = load_json(PAYMENTS_FILE) or []
+    
+    # 2. 삭제할 payment 찾기
+    target_payment_dict = None
+    target_index = None
+    
+    for i, p_dict in enumerate(all_payments_data):
+        if p_dict.get('payment_id') == payment_id:
+            target_payment_dict = p_dict
+            target_index = i
+            break
+    
+    if target_payment_dict is None:
         return {
             'success': False,
-            'message': f'❌ 상환 이력을 찾을 수 없습니다.',
+            'message': f'❌ 상환 이력을 찾을 수 없습니다 (이미 삭제된 항목일 수 있음).',
         }
     
-    # 2. 대출 가져오기
-    loan = get_loan_by_id(payment.loan_id)
+    # 3. 대출 가져오기
+    loan = get_loan_by_id(target_payment_dict.get('loan_id'))
     if not loan:
         return {
             'success': False,
             'message': f'❌ 대출을 찾을 수 없습니다.',
         }
     
-    # 3. 잔액 복원 (차감했던 원금만큼 다시 더하기)
+    # 4. 복원할 원금 정보
+    principal_to_restore = target_payment_dict.get('principal_amount', 0)
     old_balance = loan.current_balance
-    new_balance = old_balance + payment.principal_amount
+    new_balance = old_balance + principal_to_restore
     
-    # 최초 금액보다 많아질 수 없음
+    # 검증
     if new_balance > loan.initial_amount:
         return {
             'success': False,
@@ -481,27 +493,33 @@ def delete_payment(
             ),
         }
     
+    # 5. payments.json에서 제거
+    all_payments_data.pop(target_index)
+    
+    # 6. payments.json 저장 (먼저 저장!)
+    try:
+        save_json(PAYMENTS_FILE, all_payments_data)
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'❌ payments.json 저장 실패: {str(e)}\n잔액은 변경되지 않았습니다.',
+        }
+    
+    # 7. 저장 성공 후에만 잔액 업데이트
     loan.update_balance(new_balance)
     
-    # 4. 완납 상태였으면 진행중으로 복원
+    # 8. 완납 상태였으면 진행중으로 복원
     if loan.status == "완납":
         loan.status = "진행중"
         loan.memo = (loan.memo or "") + f"\n[{now_iso()[:10]}] 상환 삭제로 진행중 복원"
     
     save_loan(loan)
     
-    # 5. payment 삭제
-    all_payments = get_all_payments()
-    all_payments = [p for p in all_payments if p.payment_id != payment_id]
-    
-    payments_data = [p.to_dict() for p in all_payments]
-    save_json(PAYMENTS_FILE, payments_data)
-    
     return {
         'success': True,
         'message': (
             f'✅ 상환 이력 삭제 완료\n'
-            f'   삭제된 금액: {payment.principal_amount:,.0f}원\n'
+            f'   삭제된 금액: {principal_to_restore:,.0f}원\n'
             f'   잔액 복원: {old_balance:,.0f}원 → {new_balance:,.0f}원'
         ),
     }
