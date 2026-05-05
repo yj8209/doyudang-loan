@@ -173,7 +173,7 @@ def main():
         
         page = st.radio(
             "메뉴",
-            ["🏠 대시보드", "💸 부분 상환 입력"],
+            ["🏠 대시보드", "💸 부분 상환 입력", "📋 정기상환 확정"],
             label_visibility="collapsed"
         )
         
@@ -181,7 +181,6 @@ def main():
         
         st.markdown("### 🚀 곧 추가될 기능")
         st.caption("""
-        - 📋 정기상환 확정
         - 🎯 부분상환 시뮬레이터
         - 📈 5년 진행 그래프
         - 📅 캘린더 뷰
@@ -197,6 +196,9 @@ def main():
     elif page == "💸 부분 상환 입력":
         from src.views.payment_form import render_payment_form
         render_payment_form()
+    elif page == "📋 정기상환 확정":
+        from src.views.regular_payment_form import render_regular_payment_form
+        render_regular_payment_form()
 
 
 if __name__ == "__main__":
