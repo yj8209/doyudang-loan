@@ -161,3 +161,227 @@ def initialize_default_loans():
 
 if __name__ == '__main__':
     initialize_default_loans()
+def add_new_loan(loan: Loan, changed_by: str = "") -> dict:
+    """
+    신규 대출 추가
+    
+    Returns:
+        {
+            'success': bool,
+            'message': str,
+            'loan': Loan or None,
+        }
+    """
+    # 검증
+    if not loan.loan_name:
+        return {
+            'success': False,
+            'message': '❌ 대출명을 입력해주세요.',
+            'loan': None,
+        }
+    
+    if loan.initial_amount <= 0:
+        return {
+            'success': False,
+            'message': '❌ 최초 금액은 0보다 커야 합니다.',
+            'loan': None,
+        }
+    
+    if loan.current_balance < 0 or loan.current_balance > loan.initial_amount:
+        return {
+            'success': False,
+            'message': '❌ 현재 잔액은 0 이상, 최초 금액 이하여야 합니다.',
+            'loan': None,
+        }
+    
+    if loan.interest_rate < 0:
+        return {
+            'success': False,
+            'message': '❌ 금리는 0 이상이어야 합니다.',
+            'loan': None,
+        }
+    
+    if loan.payment_day < 1 or loan.payment_day > 31:
+        return {
+            'success': False,
+            'message': '❌ 이체일은 1~31 사이여야 합니다.',
+            'loan': None,
+        }
+    
+    # 신규 등록 이력 추가
+    loan.add_change_log(
+        change_type="신규등록",
+        reason=f"신규 대출 등록: {loan.loan_name}",
+        memo=f"최초 금액: {loan.initial_amount:,.0f}원, 금리: {loan.interest_rate}%",
+        changed_by=changed_by
+    )
+    
+    # 저장
+    save_loan(loan)
+    
+    return {
+        'success': True,
+        'message': f'✅ {loan.loan_name} 신규 등록 완료',
+        'loan': loan,
+    }
+
+
+def extend_loan_maturity(
+    loan_id: str,
+    new_maturity_date: str,
+    new_interest_rate: float = None,
+    new_rate_type: str = None,
+    new_rate_spread: float = None,
+    reason: str = "만기 연장",
+    memo: str = "",
+    changed_by: str = ""
+) -> dict:
+    """
+    대출 만기 연장
+    
+    Returns:
+        {
+            'success': bool,
+            'message': str,
+            'loan': Loan or None,
+        }
+    """
+    loan = get_loan_by_id(loan_id)
+    if not loan:
+        return {
+            'success': False,
+            'message': f'❌ 대출을 찾을 수 없습니다.',
+            'loan': None,
+        }
+    
+    # 새 만기일 검증
+    from datetime import datetime
+    try:
+        new_maturity = datetime.strptime(new_maturity_date, "%Y-%m-%d")
+        old_maturity = datetime.strptime(loan.maturity_date, "%Y-%m-%d")
+        
+        if new_maturity <= old_maturity:
+            return {
+                'success': False,
+                'message': '❌ 새 만기일은 기존 만기일보다 미래여야 합니다.',
+                'loan': None,
+            }
+    except ValueError:
+        return {
+            'success': False,
+            'message': '❌ 만기일 형식이 잘못됐습니다 (YYYY-MM-DD).',
+            'loan': None,
+        }
+    
+    # 만기 연장 처리
+    old_maturity_date = loan.maturity_date
+    old_interest_rate = loan.interest_rate
+    
+    loan.extend_maturity(
+        new_maturity_date=new_maturity_date,
+        new_interest_rate=new_interest_rate,
+        new_rate_type=new_rate_type,
+        new_rate_spread=new_rate_spread,
+        reason=reason,
+        changed_by=changed_by
+    )
+    
+    # 메모 추가
+    if memo:
+        loan.memo = (loan.memo or "") + f"\n  📝 {memo}"
+    
+    save_loan(loan)
+    
+    # 변경 사항 메시지
+    changes = [f'만기일: {old_maturity_date} → {new_maturity_date}']
+    if new_interest_rate is not None and new_interest_rate != old_interest_rate:
+        changes.append(f'금리: {old_interest_rate}% → {new_interest_rate}%')
+    if new_rate_type is not None and new_rate_type != loan.rate_type:
+        changes.append(f'금리종류 변경')
+    
+    return {
+        'success': True,
+        'message': f'✅ {loan.loan_name} 만기 연장 완료\n   ' + '\n   '.join(changes),
+        'loan': loan,
+    }
+
+
+def update_loan_info(
+    loan_id: str,
+    updates: dict,
+    reason: str = "",
+    memo: str = "",
+    changed_by: str = ""
+) -> dict:
+    """
+    대출 정보 일반 수정 (만기 연장 외)
+    
+    Args:
+        loan_id: 대출 ID
+        updates: {field_name: new_value} 변경할 필드들
+            예: {"interest_rate": 5.78, "rate_type": "변동"}
+    
+    Returns:
+        {
+            'success': bool,
+            'message': str,
+            'loan': Loan or None,
+        }
+    """
+    loan = get_loan_by_id(loan_id)
+    if not loan:
+        return {
+            'success': False,
+            'message': f'❌ 대출을 찾을 수 없습니다.',
+            'loan': None,
+        }
+    
+    # 허용된 필드만 수정
+    allowed_fields = [
+        'loan_name', 'bank_name', 'branch', 'account_number',
+        'interest_rate', 'rate_type', 'rate_base', 'rate_spread',
+        'payment_day', 'memo', 'current_balance'
+    ]
+    
+    changes_made = []
+    
+    for field, new_value in updates.items():
+        if field not in allowed_fields:
+            continue
+        
+        old_value = getattr(loan, field, None)
+        
+        if old_value != new_value:
+            setattr(loan, field, new_value)
+            
+            loan.add_change_log(
+                change_type="정보수정",
+                field_changed=field,
+                old_value=str(old_value),
+                new_value=str(new_value),
+                reason=reason,
+                memo=memo,
+                changed_by=changed_by
+            )
+            
+            changes_made.append(f'{field}: {old_value} → {new_value}')
+    
+    if not changes_made:
+        return {
+            'success': False,
+            'message': '⚠️ 변경 사항이 없습니다.',
+            'loan': loan,
+        }
+    
+    save_loan(loan)
+    
+    return {
+        'success': True,
+        'message': f'✅ {loan.loan_name} 정보 수정 완료\n   ' + '\n   '.join(changes_made),
+        'loan': loan,
+    }
+
+
+def get_all_loans_including_completed() -> List[Loan]:
+    """완납된 대출 포함 전체 조회"""
+    return get_all_loans()
