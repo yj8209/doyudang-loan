@@ -317,3 +317,217 @@ def estimate_monthly_payment(loan) -> dict:
             'expected_interest': expected_interest,
             'expected_total': expected_interest,
         }
+def get_all_payments() -> List[Payment]:
+    """모든 상환 이력 조회 (날짜 최신순)"""
+    payments = load_json(PAYMENTS_FILE) or []
+    
+    payment_list = []
+    for data in payments:
+        try:
+            p = Payment.from_dict(data)
+            payment_list.append(p)
+        except Exception as e:
+            print(f"⚠️ payment 로드 실패: {e}")
+    
+    # 날짜 최신순으로 정렬
+    payment_list.sort(key=lambda p: p.payment_date, reverse=True)
+    
+    return payment_list
+
+
+def get_payment_by_id(payment_id: str) -> Payment:
+    """특정 상환 이력 조회"""
+    all_payments = get_all_payments()
+    for p in all_payments:
+        if p.payment_id == payment_id:
+            return p
+    return None
+
+
+def update_payment(
+    payment_id: str,
+    new_principal: float = None,
+    new_interest: float = None,
+    new_overdue: float = None,
+    new_date: str = None,
+    new_source: str = None,
+    new_memo: str = None,
+    changed_by: str = ""
+) -> dict:
+    """
+    기존 상환 이력 수정 + 잔액 자동 보정
+    
+    주의: 잔액 변경에 영향을 주므로 신중하게!
+    """
+    # 1. 기존 payment 가져오기
+    payment = get_payment_by_id(payment_id)
+    if not payment:
+        return {
+            'success': False,
+            'message': f'❌ 상환 이력을 찾을 수 없습니다.',
+            'payment': None,
+        }
+    
+    # 2. 대출 가져오기
+    loan = get_loan_by_id(payment.loan_id)
+    if not loan:
+        return {
+            'success': False,
+            'message': f'❌ 대출을 찾을 수 없습니다.',
+            'payment': None,
+        }
+    
+    # 3. 변경 전 원금 (잔액 보정용)
+    old_principal = payment.principal_amount
+    
+    # 4. 새 값 적용
+    if new_principal is not None:
+        payment.principal_amount = float(new_principal)
+    if new_interest is not None:
+        payment.interest_amount = float(new_interest)
+    if new_overdue is not None:
+        payment.overdue_interest = float(new_overdue)
+    if new_date is not None:
+        payment.payment_date = new_date
+    if new_source is not None:
+        payment.source = new_source
+    if new_memo is not None:
+        payment.memo = new_memo
+    
+    # 5. 총액 재계산
+    payment.total_amount = (
+        payment.principal_amount + 
+        payment.interest_amount + 
+        payment.overdue_interest
+    )
+    
+    # 6. 잔액 보정 (원금 변경 시)
+    new_principal_value = payment.principal_amount
+    principal_diff = new_principal_value - old_principal
+    
+    if principal_diff != 0:
+        # 대출 잔액에서 차이만큼 더 빼거나 (원금 증가) 더하거나 (원금 감소)
+        loan.current_balance = loan.current_balance - principal_diff
+        loan.update_balance(loan.current_balance)
+        save_loan(loan)
+    
+    # 7. balance_after 갱신
+    payment.balance_after = loan.current_balance
+    
+    # 8. 변경 이력 메모 추가
+    payment.memo = (payment.memo or "") + f"\n[{now_iso()[:10]}] 수정됨 ({changed_by})"
+    
+    # 9. payment 저장 (전체 다시 저장)
+    all_payments = get_all_payments()
+    
+    # 기존 payment 교체
+    for i, p in enumerate(all_payments):
+        if p.payment_id == payment_id:
+            all_payments[i] = payment
+            break
+    
+    # 전체 다시 저장
+    payments_data = [p.to_dict() for p in all_payments]
+    save_json(PAYMENTS_FILE, payments_data)
+    
+    return {
+        'success': True,
+        'message': (
+            f'✅ 상환 이력 수정 완료\n'
+            f'   원금: {old_principal:,.0f}원 → {new_principal_value:,.0f}원\n'
+            f'   잔액 보정: {principal_diff:+,.0f}원'
+        ),
+        'payment': payment,
+    }
+
+
+def delete_payment(
+    payment_id: str,
+    reason: str = "",
+    changed_by: str = ""
+) -> dict:
+    """
+    상환 이력 삭제 + 잔액 자동 복원
+    
+    주의: 잔액에서 차감했던 원금을 복원합니다!
+    """
+    # 1. 삭제할 payment 가져오기
+    payment = get_payment_by_id(payment_id)
+    if not payment:
+        return {
+            'success': False,
+            'message': f'❌ 상환 이력을 찾을 수 없습니다.',
+        }
+    
+    # 2. 대출 가져오기
+    loan = get_loan_by_id(payment.loan_id)
+    if not loan:
+        return {
+            'success': False,
+            'message': f'❌ 대출을 찾을 수 없습니다.',
+        }
+    
+    # 3. 잔액 복원 (차감했던 원금만큼 다시 더하기)
+    old_balance = loan.current_balance
+    new_balance = old_balance + payment.principal_amount
+    
+    # 최초 금액보다 많아질 수 없음
+    if new_balance > loan.initial_amount:
+        return {
+            'success': False,
+            'message': (
+                f'❌ 잔액 복원 시 최초 금액({loan.initial_amount:,.0f}원)을 '
+                f'초과합니다. 데이터 정합성 오류 가능성 있음.'
+            ),
+        }
+    
+    loan.update_balance(new_balance)
+    
+    # 4. 완납 상태였으면 진행중으로 복원
+    if loan.status == "완납":
+        loan.status = "진행중"
+        loan.memo = (loan.memo or "") + f"\n[{now_iso()[:10]}] 상환 삭제로 진행중 복원"
+    
+    save_loan(loan)
+    
+    # 5. payment 삭제
+    all_payments = get_all_payments()
+    all_payments = [p for p in all_payments if p.payment_id != payment_id]
+    
+    payments_data = [p.to_dict() for p in all_payments]
+    save_json(PAYMENTS_FILE, payments_data)
+    
+    return {
+        'success': True,
+        'message': (
+            f'✅ 상환 이력 삭제 완료\n'
+            f'   삭제된 금액: {payment.principal_amount:,.0f}원\n'
+            f'   잔액 복원: {old_balance:,.0f}원 → {new_balance:,.0f}원'
+        ),
+    }
+
+
+def get_payments_with_filters(
+    loan_id: str = None,
+    payment_type: str = None,
+    days_back: int = None
+) -> List[Payment]:
+    """필터링된 상환 이력 조회"""
+    from datetime import datetime, timedelta
+    
+    all_payments = get_all_payments()
+    
+    # 대출 필터
+    if loan_id:
+        all_payments = [p for p in all_payments if p.loan_id == loan_id]
+    
+    # 종류 필터
+    if payment_type:
+        all_payments = [p for p in all_payments if p.payment_type == payment_type]
+    
+    # 기간 필터
+    if days_back:
+        cutoff = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        all_payments = [p for p in all_payments if p.payment_date >= cutoff]
+    
+    return all_payments    

@@ -173,7 +173,7 @@ def main():
         
         page = st.radio(
             "메뉴",
-            ["🏠 대시보드", "💸 부분 상환 입력", "📋 정기상환 확정", "🎯 부분상환 시뮬레이터", "🆕 신규 대출 추가", "🔄 대출 수정 / 만기 연장"],
+            ["🏠 대시보드", "💸 부분 상환 입력", "📋 정기상환 확정", "🎯 부분상환 시뮬레이터", "🆕 신규 대출 추가", "🔄 대출 수정 / 만기 연장", "📜 상환 이력 관리"],
             label_visibility="collapsed"
         )
         
@@ -206,7 +206,10 @@ def main():
         render_new_loan_form()
     elif page == "🔄 대출 수정 / 만기 연장":
         from src.views.loan_edit_form import render_loan_edit_form
-        render_loan_edit_form()      
+        render_loan_edit_form()
+    elif page == "📜 상환 이력 관리":
+        from src.views.payment_history_view import render_payment_history
+        render_payment_history()          
 
 
 if __name__ == "__main__":
