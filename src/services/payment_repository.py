@@ -428,7 +428,7 @@ def update_payment(
     
     # 전체 다시 저장
     payments_data = [p.to_dict() for p in all_payments]
-    save_json(PAYMENTS_FILE, payments_data)
+    save_json(payments_data, PAYMENTS_FILE)
     
     return {
         'success': True,
@@ -498,7 +498,7 @@ def delete_payment(
     
     # 6. payments.json 저장 (먼저 저장!)
     try:
-        save_json(PAYMENTS_FILE, all_payments_data)
+        save_json(all_payments_data, PAYMENTS_FILE)
     except Exception as e:
         return {
             'success': False,

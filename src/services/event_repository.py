@@ -92,7 +92,7 @@ def add_event(event: FundEvent) -> dict:
     all_events_data.append(event.to_dict())
     
     try:
-        save_json(EVENTS_FILE, all_events_data)
+        save_json(all_events_data, EVENTS_FILE)
     except Exception as e:
         return {
             'success': False,
@@ -131,7 +131,7 @@ def update_event(event_id: str, updates: dict) -> dict:
     all_events_data[target_index]['updated_at'] = now_iso()
     
     try:
-        save_json(EVENTS_FILE, all_events_data)
+        save_json(all_events_data, EVENTS_FILE)
     except Exception as e:
         return {
             'success': False,
@@ -170,7 +170,7 @@ def delete_event(event_id: str) -> dict:
     all_events_data.pop(target_index)
     
     try:
-        save_json(EVENTS_FILE, all_events_data)
+        save_json(all_events_data, EVENTS_FILE)
     except Exception as e:
         return {
             'success': False,
